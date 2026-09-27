@@ -19,10 +19,11 @@ from env, so changing `BACKEND_URL` is the only edit needed. The browser only ev
 
 ## 🚀 Local Setup
 
-Prerequisites: Node.js v26+, Docker Desktop.
+Prerequisites: Node.js v26+, Yarn (any version, e.g. `npm install -g yarn`), Docker Desktop.
+Each app pins Yarn 4 in its own `.yarn/releases/`, and your global `yarn` hands off to it automatically.
 
 ```bash
-node setup.js              # npm install in backend/app/ + frontend/, scaffold .env files
+node setup.js              # yarn install in backend/app/ + frontend/, scaffold .env files
 # fill in GOOGLE_CLIENT_ID and ADMIN_EMAIL in backend/app/.env (see "Sign-in" below)
 node start.js              # Postgres in Docker + backend (:4000) and frontend (:4001) in new terminal windows
 node stop.js               # kill :4000/:4001 and stop Postgres
@@ -56,10 +57,32 @@ backend/app/src/
 
 ## 🧪 Tests
 
+From the repo root, these run across both apps:
+
 ```bash
-cd backend/app && npm test  # node:test; test files sit next to the code: src/**/<name>.<kind>.test.js
-cd frontend    && npm test  # Vitest + React Testing Library; tests live in src/__tests__/
+yarn lint                 # ESLint in backend/app and frontend
+yarn test                 # unit tests in backend/app and frontend
+yarn test:integration     # backend integration tests (needs Docker)
+yarn build                # production build of the frontend
 ```
+
+Or inside one app:
+
+```bash
+cd backend/app
+yarn test                 # unit tests (node:test), next to the code: src/**/<name>.<kind>.test.js
+yarn test:integration     # integration tests against a real Postgres (needs Docker), ~2s
+yarn lint                 # ESLint
+
+cd frontend
+yarn test                 # Vitest + React Testing Library; tests live in src/__tests__/
+yarn lint                 # ESLint
+```
+
+The integration tests (`backend/app/test/integration/`) start a throwaway Postgres container on a free port,
+boot the real app with `setupApp()`, and call the API over HTTP: sign-in, the allowed list, expenses,
+balances and settle-ups, including concurrent settle-ups. Only Google's signature check is faked. The
+container is always removed afterwards, and your dev database is never touched.
 
 ## 🔐 Sign-in
 
@@ -88,7 +111,7 @@ Sessions are stored in Postgres (`sessions` table) and kept in a 30-day httpOnly
 
 ## 🗄️ Database
 
-- Migrations run automatically when the backend starts (or manually with `npm run migrate` in `backend/app/`).
+- Migrations run automatically when the backend starts (or manually with `yarn migrate` in `backend/app/`).
   Add a new numbered file (`002_something.sql`) for schema changes; never edit one that has already run.
 - Money is stored as **integer minor units** (cents / paise, `amount_minor BIGINT`), never floats. Each
   expense has a currency (USD or INR, default USD); balances and settle-ups are kept per currency.

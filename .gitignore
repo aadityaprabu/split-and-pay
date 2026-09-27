@@ -1,6 +1,11 @@
-# Node.js and npm
+# Node.js and Yarn
 # Ignore all node_modules directories
 node_modules/
+
+# Yarn 4: commit the pinned release (.yarn/releases), ignore its install state and caches
+**/.yarn/*
+!**/.yarn/releases
+**/.pnp.*
 
 # Ignore .env files everywhere
 .env

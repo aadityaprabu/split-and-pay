@@ -1,0 +1,15 @@
+{
+  "name": "split-and-pay",
+  "private": true,
+  "description": "Runs tasks across both apps from the repo root. Each app has its own dependencies, lockfile and pinned Yarn.",
+  "scripts": {
+    "setup": "node setup.js",
+    "start": "node start.js",
+    "stop": "node stop.js",
+    "lint": "cd backend/app && yarn lint && cd ../../frontend && yarn lint",
+    "test": "cd backend/app && yarn test && cd ../../frontend && yarn test",
+    "test:integration": "cd backend/app && yarn test:integration",
+    "build": "cd frontend && yarn build"
+  },
+  "license": "MIT"
+}

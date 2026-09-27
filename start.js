@@ -200,7 +200,7 @@ const services = [
   {
     windowTitle: `Split & Pay - Frontend :${frontendPort}`,
     folderPath: path.join(repoFolder, "frontend"),
-    command: "npm run dev",
+    command: "yarn dev",
   },
 ];
 

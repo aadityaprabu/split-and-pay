@@ -23,6 +23,7 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@tailwindcss/vite": "^4.3.3",
+    "@testing-library/dom": "^10.4.2",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
     "@testing-library/user-event": "^14.6.7",
@@ -37,5 +38,6 @@
     "tailwindcss": "^4.3.3",
     "vite": "^8.3.1",
     "vitest": "^5.0.2"
-  }
+  },
+  "packageManager": "yarn@4.18.1"
 }

@@ -7,7 +7,9 @@
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
     "migrate": "node src/database/migrate.js",
-    "test": "node --test"
+    "test": "node --test \"src/**/*.test.js\"",
+    "test:integration": "node test/integration/run.js",
+    "lint": "eslint ."
   },
   "license": "MIT",
   "engines": {
@@ -19,5 +21,11 @@
     "express": "^5.2.1",
     "google-auth-library": "^11.1.0",
     "pg": "^8.23.0"
-  }
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.11.0",
+    "globals": "^17.12.0"
+  },
+  "packageManager": "yarn@4.18.1"
 }

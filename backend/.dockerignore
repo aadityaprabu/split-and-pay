@@ -21,3 +21,8 @@ Dockerfile
 
 # Tests live next to the code but don't belong in the production image
 **/*.test.js
+
+# Integration tests and their runner only run on a dev machine
+app/test/
+app/eslint.config.js
+app/.yarn/install-state.gz

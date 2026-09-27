@@ -10,6 +10,16 @@ const repoFolder = __dirname;
 // App folders that need their dependencies installed
 const appFolders = ["backend/app", "frontend"];
 
+// Each app pins Yarn 4 in its .yarn/releases; any global `yarn` (even 1.x) hands off to that version
+function ensureYarnIsInstalled() {
+  try {
+    execSync("yarn --version", { stdio: "ignore" });
+  } catch {
+    console.error("Yarn isn't installed. Install it once with: npm install -g yarn");
+    process.exit(1);
+  }
+}
+
 // Runs a shell command in a given folder
 function runCommand(command, inFolder = repoFolder) {
   execSync(command, { cwd: inFolder, stdio: "inherit" });
@@ -18,6 +28,7 @@ function runCommand(command, inFolder = repoFolder) {
 // ─── Step 1: Install dependencies for each app ───────────────────────────────
 
 console.log("Setting up Split & Pay...\n");
+ensureYarnIsInstalled();
 
 for (const relativeFolder of appFolders) {
   const appFolder = path.join(repoFolder, relativeFolder);
@@ -28,8 +39,8 @@ for (const relativeFolder of appFolders) {
     continue;
   }
 
-  console.log(`  npm install → ${relativeFolder}`);
-  runCommand("npm install", appFolder);
+  console.log(`  yarn install → ${relativeFolder}`);
+  runCommand("yarn install", appFolder);
   console.log("");
 }
 

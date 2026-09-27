@@ -10,11 +10,13 @@ ARG FRONTEND_BASE_URL
 ENV VITE_BACKEND_URL=$BACKEND_URL
 ENV VITE_BASE_URL=$FRONTEND_BASE_URL
 
-COPY package*.json ./
-RUN npm ci
+# Yarn itself comes from the repo (.yarn/releases, pinned by .yarnrc.yml): the image has no yarn of its own
+COPY package.json yarn.lock .yarnrc.yml ./
+COPY .yarn/releases ./.yarn/releases
+RUN node .yarn/releases/yarn-*.cjs install --immutable
 
 COPY . .
-RUN npm run build
+RUN node .yarn/releases/yarn-*.cjs build
 
 FROM nginx:alpine
 
