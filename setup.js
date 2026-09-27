@@ -53,9 +53,10 @@ runCommand("node generateEnvFiles.js");
 console.log(`
 Setup complete. Next steps:
 
-  1. Fill in the empty values in (not committed to git):
-       backend/app/.env → GOOGLE_CLIENT_ID, ADMIN_EMAIL
+  1. Fill in the empty values (these files are not committed to git):
+       backend/app/.env → GOOGLE_CLIENT_ID, ADMIN_EMAIL   (used by: yarn start)
+       .env             → GOOGLE_CLIENT_ID, ADMIN_EMAIL   (used by: docker compose up)
 
-  2. Start all services:
-       node start.js
+  2. Start everything:
+       yarn start      (or: node start.js)
 `);
