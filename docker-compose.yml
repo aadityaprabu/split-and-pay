@@ -1,0 +1,79 @@
+# One compose file for the VPS (Coolify) and local development.
+#   VPS / Coolify: the whole stack. nginx in the frontend proxies BACKEND_URL (/split-and-pay) to the backend's /api.
+#   node start.js: only the postgres service (backend and frontend run natively for hot reload).
+#   docker compose up --build: the whole stack locally on :FRONTEND_PORT (reads the root .env).
+# Postgres and the backend are published on 127.0.0.1 only: reachable from the machine itself
+# (start.js needs that locally), never from the internet.
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      - POSTGRES_USER=$POSTGRES_USER
+      - POSTGRES_PASSWORD=$POSTGRES_PASSWORD
+      - POSTGRES_DB=$POSTGRES_DB
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      - ENV=$ENV
+      - BACKEND_PORT=$BACKEND_PORT
+      - POSTGRES_HOST=$POSTGRES_HOST
+      - POSTGRES_PORT=$POSTGRES_PORT
+      - POSTGRES_USER=$POSTGRES_USER
+      - POSTGRES_PASSWORD=$POSTGRES_PASSWORD
+      - POSTGRES_DB=$POSTGRES_DB
+      - GOOGLE_CLIENT_ID=$GOOGLE_CLIENT_ID
+      - ADMIN_EMAIL=$ADMIN_EMAIL
+    image: split-and-pay-backend
+    ports:
+      - "127.0.0.1:${BACKEND_PORT}:${BACKEND_PORT}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:$$BACKEND_PORT/api/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - BACKEND_URL
+        - FRONTEND_BASE_URL
+    environment:
+      # Read by the nginx config template when the container starts
+      - FRONTEND_PORT=$FRONTEND_PORT
+      - BACKEND_URL=$BACKEND_URL
+      - BACKEND_PORT=$BACKEND_PORT
+    image: split-and-pay-frontend
+    ports:
+      - "${FRONTEND_PORT}:${FRONTEND_PORT}"
+    depends_on:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:$$FRONTEND_PORT/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+    driver: local

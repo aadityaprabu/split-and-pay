@@ -1,0 +1,20 @@
+# Node.js and npm
+# Ignore all node_modules directories
+node_modules/
+
+# Ignore .env files everywhere
+.env
+.env.local
+
+# Ignore common build and output directories
+# for frontend and backend
+dist/
+build/
+coverage/
+
+# Vscode and editor files
+.vscode/
+.DS_Store
+
+# Log files
+*.log
