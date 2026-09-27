@@ -135,5 +135,6 @@ FRONTEND_BASE_URL=/
 BACKEND_URL=/split-and-pay
 ```
 
-The same `docker-compose.yml` runs locally and on the VPS. Postgres and the backend are published on
-`127.0.0.1` only, so they are reachable from the VPS itself but never from the internet.
+The same `docker-compose.yml` runs locally and on the VPS. Every port is published on `127.0.0.1` only,
+so nothing is reachable from the internet directly. In Coolify, give only the **frontend** service a domain,
+with the container port on the end (e.g. `https://split.example.com:4001`); Coolify's proxy serves it over HTTPS.

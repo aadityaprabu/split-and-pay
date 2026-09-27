@@ -2,8 +2,9 @@
 #   VPS / Coolify: the whole stack. nginx in the frontend proxies BACKEND_URL (/split-and-pay) to the backend's /api.
 #   node start.js: only the postgres service (backend and frontend run natively for hot reload).
 #   docker compose up --build: the whole stack locally on :FRONTEND_PORT (reads the root .env).
-# Postgres and the backend are published on 127.0.0.1 only: reachable from the machine itself
-# (start.js needs that locally), never from the internet.
+# Every port is published on 127.0.0.1 only: reachable from the machine itself (start.js and your browser
+# need that locally), never from the internet. On the VPS, Coolify's proxy reaches the frontend over the
+# docker network (domain https://your-domain:FRONTEND_PORT) and serves it over HTTPS.
 services:
   postgres:
     image: postgres:18-alpine
@@ -63,7 +64,7 @@ services:
       - BACKEND_PORT=$BACKEND_PORT
     image: split-and-pay-frontend
     ports:
-      - "${FRONTEND_PORT}:${FRONTEND_PORT}"
+      - "127.0.0.1:${FRONTEND_PORT}:${FRONTEND_PORT}"
     depends_on:
       - backend
     healthcheck:
