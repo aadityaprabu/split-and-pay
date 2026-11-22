@@ -251,8 +251,9 @@ Removing someone from the list signs them out immediately. Their past expenses s
   until someone has settled part of it.
 - **Groups** keep a trip or a set of bills together. Only a group's members (and anyone on one of its
   expenses) see its expenses, and the Expenses page can be filtered by group. Balances and settling up
-  still cover everything between two people, across groups. A group with expenses can't be deleted, and
-  someone on one of its expenses can't be removed from it.
+  still cover everything between two people, across groups. Only whoever made a group can rename it, change
+  its members or delete it. A group with expenses can't be deleted, and someone who added, paid for or
+  has a share in one of its expenses can't be removed from it.
 - **Settle up** shows your net balance with each person, per currency. **Settle up → Confirm** records
   the payment and marks the shared expenses between the two of you as settled. Choose **Part of it** to
   record a partial payment instead: it lowers the balance, the expenses stay open, and the next full

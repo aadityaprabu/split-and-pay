@@ -63,25 +63,36 @@ async function createGroup(body, userId) {
   });
 }
 
-/** Locks the group and checks the user is in it. Returns its current member ids. */
-async function lockGroupAsMember(client, groupId, userId) {
+/**
+ * Locks the group for a change by whoever made it. Other members get a 403; anyone outside the group
+ * gets a 404, as if it didn't exist. Returns its current member ids.
+ * The FOR UPDATE also makes this wait for, and then block, any expense being saved into the group
+ * (assertGroupCovers holds a FOR SHARE lock on the same row).
+ */
+async function lockGroupForCreator(client, groupId, userId, action) {
   if (!Validation.UUID_PATTERN.test(groupId)) throw new HttpError(404, "That group doesn't exist");
-  const { rowCount } = await client.query("SELECT 1 FROM groups WHERE id = $1 FOR UPDATE", [groupId]);
-  if (rowCount === 0) throw new HttpError(404, "That group doesn't exist");
+  const { rows: groupRows } = await client.query("SELECT created_by FROM groups WHERE id = $1 FOR UPDATE", [
+    groupId,
+  ]);
+  if (groupRows.length === 0) throw new HttpError(404, "That group doesn't exist");
   const { rows } = await client.query("SELECT user_id FROM group_members WHERE group_id = $1", [groupId]);
   const memberIds = rows.map((row) => row.user_id);
   if (!memberIds.includes(userId)) throw new HttpError(404, "That group doesn't exist");
+  if (groupRows[0].created_by !== userId) {
+    throw new HttpError(403, `Only the person who made this group can ${action} it`);
+  }
   return memberIds;
 }
 
 /**
- * Renames the group and replaces its members. Any member can. Someone who is on one of the group's
- * expenses can't be removed, or that expense would have people outside its group.
+ * Renames the group and replaces its members. Only whoever made the group can, and they always stay
+ * in it. Someone who added, paid for or has a share in one of the group's expenses can't be removed,
+ * or that expense would have people outside its group.
  */
 async function updateGroup(groupId, body, userId) {
   const { name, memberIds } = parseGroupInput(body, userId);
   await withTransaction(async (client) => {
-    const currentIds = await lockGroupAsMember(client, groupId, userId);
+    const currentIds = await lockGroupForCreator(client, groupId, userId, "change");
     const addedIds = memberIds.filter((id) => !currentIds.includes(id));
     await assertAllParticipants(client, addedIds);
 
@@ -90,7 +101,7 @@ async function updateGroup(groupId, body, userId) {
       const { rows } = await client.query(
         `SELECT DISTINCT users.name FROM expenses
          JOIN expense_splits ON expense_splits.expense_id = expenses.id
-         JOIN users ON users.id IN (expenses.paid_by, expense_splits.user_id)
+         JOIN users ON users.id IN (expenses.created_by, expenses.paid_by, expense_splits.user_id)
          WHERE expenses.group_id = $1 AND expenses.deleted_at IS NULL AND users.id = ANY($2::uuid[])`,
         [groupId, removedIds]
       );
@@ -114,7 +125,7 @@ async function updateGroup(groupId, body, userId) {
 /** Only an empty group can be deleted: expenses keep their group so the history stays readable */
 async function deleteGroup(groupId, userId) {
   await withTransaction(async (client) => {
-    await lockGroupAsMember(client, groupId, userId);
+    await lockGroupForCreator(client, groupId, userId, "delete");
     const { rowCount } = await client.query(
       "SELECT 1 FROM expenses WHERE group_id = $1 AND deleted_at IS NULL LIMIT 1",
       [groupId]
@@ -132,6 +143,9 @@ async function deleteGroup(groupId, userId) {
  */
 async function assertGroupCovers(client, groupId, userId, everyoneInvolved) {
   if (!Validation.UUID_PATTERN.test(groupId)) throw new HttpError(400, "That group doesn't exist");
+  // Waits for a member change in progress, and holds off new ones until this expense is saved, so the
+  // membership checked below is still the membership when this commits
+  await client.query("SELECT 1 FROM groups WHERE id = $1 FOR SHARE", [groupId.toLowerCase()]);
   const { rows } = await client.query(
     "SELECT user_id FROM group_members WHERE group_id = $1 FOR SHARE",
     [groupId.toLowerCase()]

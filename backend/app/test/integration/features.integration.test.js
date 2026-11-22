@@ -96,6 +96,39 @@ test("a group's expenses are seen by its members and the people on them, and can
   assert.deepEqual((await chen.client.get("/groups")).body.data, []);
 });
 
+test("only whoever made a group can rename it, change its members or delete it", async () => {
+  const { asha, bala, chen } = await setup();
+  const groupId = (await asha.client.post("/groups", { name: "Trip", member_ids: [bala.user.id] })).body.data.id;
+
+  const rename = await bala.client.put(`/groups/${groupId}`, { name: "Bala's trip", member_ids: [asha.user.id] });
+  assert.equal(rename.status, 403);
+  assert.equal((await bala.client.delete(`/groups/${groupId}`)).status, 403);
+  assert.equal((await chen.client.put(`/groups/${groupId}`, { name: "x" })).status, 404, "outsiders don't see it");
+
+  const [group] = (await asha.client.get("/groups")).body.data;
+  assert.equal(group.name, "Trip");
+  assert.equal(group.members.length, 2);
+
+  // The creator can't drop themselves: they're always put back in
+  const leave = await asha.client.put(`/groups/${groupId}`, { name: "Goa", member_ids: [bala.user.id] });
+  assert.equal(leave.status, 200);
+  const [renamed] = (await asha.client.get("/groups")).body.data;
+  assert.deepEqual(renamed.members.map((member) => member.name), ["Asha", "Bala"]);
+});
+
+test("whoever added a group expense can't be removed from the group either", async () => {
+  const { asha, bala, chen } = await setup();
+  const groupId = (
+    await asha.client.post("/groups", { name: "Trip", member_ids: [bala.user.id, chen.user.id] })
+  ).body.data.id;
+  // Chen adds it, but only Asha and Bala are on it
+  await addExpense(chen.client, expenseBody(asha.user.id, [asha.user.id, bala.user.id], 2000, { group_id: groupId }));
+
+  const removeChen = await asha.client.put(`/groups/${groupId}`, { name: "Trip", member_ids: [bala.user.id] });
+  assert.equal(removeChen.status, 409);
+  assert.match(removeChen.body.message, /Chen/);
+});
+
 test("everyone on a group expense must be in the group", async () => {
   const { asha, bala, chen } = await setup();
   const groupId = (await asha.client.post("/groups", { name: "Trip", member_ids: [bala.user.id] })).body.data.id;

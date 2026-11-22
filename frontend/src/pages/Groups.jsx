@@ -100,6 +100,8 @@ function GroupForm({ users, currentUserId, initialGroup, onSaved, onCancel }) {
 function GroupRow({ group, currentUserId, onEdit, onDeleted }) {
   const [error, setError] = useState(null);
   const others = group.members.filter((member) => member.id !== currentUserId);
+  // Only whoever made the group can rename it, change its members or delete it
+  const isCreator = group.created_by === currentUserId;
 
   const remove = async () => {
     if (!window.confirm(`Delete the group "${group.name}"?`)) return;
@@ -134,15 +136,17 @@ function GroupRow({ group, currentUserId, onEdit, onDeleted }) {
             </span>
           ))}
         </div>
-        <button
-          type="button"
-          onClick={onEdit}
-          aria-label={`Edit ${group.name}`}
-          className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-800"
-        >
-          <PencilIcon className="size-4" />
-        </button>
-        {group.expense_count === 0 && (
+        {isCreator && (
+          <button
+            type="button"
+            onClick={onEdit}
+            aria-label={`Edit ${group.name}`}
+            className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-800"
+          >
+            <PencilIcon className="size-4" />
+          </button>
+        )}
+        {isCreator && group.expense_count === 0 && (
           <button
             type="button"
             onClick={remove}
