@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../auth/authContext";
 import Avatar from "../components/Avatar";
+import { DownloadIcon } from "../components/Icons";
 import { ApiStatus, Transactions as TransactionsConfig, expenseRoute } from "../constants/constants";
+import { Environment } from "../constants/environment";
 import useApiData from "../hooks/useApiData";
 import api from "../utils/backendApi";
 import { formatDay, formatMonth } from "../utils/dates";
@@ -229,8 +231,24 @@ export default function Transactions() {
 
   return (
     <section>
-      <h1 className="text-2xl font-bold">My transactions</h1>
-      <p className="mt-1 text-sm text-gray-600">Every expense you paid for or have a share in, newest first.</p>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold">My transactions</h1>
+          <p className="mt-1 text-sm text-gray-600">Every expense you paid for or have a share in, newest first.</p>
+        </div>
+        {/* A plain link: the browser downloads the file with the session cookie, and gets every
+            matching transaction, not just the pages loaded here */}
+        {pages.items.length > 0 && (
+          <a
+            href={withQuery(`${Environment.BACKEND_URL}/transactions/export`, query)}
+            download
+            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium hover:bg-gray-50"
+          >
+            <DownloadIcon className="size-4" />
+            {query ? "Download filtered CSV" : "Download CSV"}
+          </a>
+        )}
+      </div>
 
       <FilterBar filters={filters} onChange={setFilters} people={people} />
       <MonthlySummary rows={summary.data} error={summary.error} isLoading={summary.isLoading} />

@@ -131,3 +131,42 @@ test("bad filters are a 400, and signing in is required", async () => {
   await asha.client.post("/auth/logout");
   assert.equal((await asha.client.get("/transactions")).status, 401);
 });
+
+test("the CSV download has every transaction matching the filters, not just one page", async () => {
+  const { asha, bala, chitra } = await threeRoommates();
+  const both = [asha.user.id, bala.user.id];
+  for (let day = 1; day <= 12; day += 1) {
+    await addExpense(asha.client, {
+      paidBy: asha.user.id,
+      people: both,
+      description: `Day ${day}`,
+      spentOn: `2026-05-${String(day).padStart(2, "0")}`,
+    });
+  }
+  await addExpense(bala.client, {
+    paidBy: bala.user.id,
+    people: both,
+    description: "=cmd, \"quoted\"",
+    spentOn: "2026-06-01",
+    amount: 2550,
+  });
+  await addExpense(bala.client, { paidBy: bala.user.id, people: [bala.user.id, chitra.user.id], description: "Not Asha's" });
+
+  const response = await asha.client.get("/transactions/export?from=2026-05-01");
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get("content-type"), /^text\/csv/);
+  assert.match(response.headers.get("content-disposition"), /^attachment; filename="transactions-\d{4}-\d{2}-\d{2}\.csv"$/);
+
+  const text = response.body;
+  // fetch's text() drops the byte order mark the server sends for Excel
+  const lines = text.replace(/^\uFEFF/, "").trimEnd().split("\r\n");
+  assert.equal(lines[0], "Date,Title,Group,Paid by,People,Currency,Total,You paid,Your share,Notes");
+  assert.equal(lines.length, 1 + 13, "all 13 of Asha's from May on, past the 10-row page");
+  assert.equal(lines[1], `2026-06-01,"'=cmd, ""quoted""",,Bala,Asha; Bala,USD,25.50,0.00,12.75,`);
+  assert.equal(lines[2], "2026-05-12,Day 12,,You,Asha; Bala,USD,100.00,100.00,50.00,");
+  assert.ok(!text.includes("Not Asha's"));
+
+  const filtered = await asha.client.get("/transactions/export?q=day%201");
+  const titles = filtered.body.trimEnd().split("\r\n").slice(1).map((line) => line.split(",")[1]);
+  assert.deepEqual(titles, ["Day 12", "Day 11", "Day 10", "Day 1"]);
+});

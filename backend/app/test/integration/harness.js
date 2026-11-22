@@ -79,7 +79,7 @@ function createClient(context) {
     } catch {
       // Plain-text responses, like /healthz
     }
-    return { status: response.status, body: parsed };
+    return { status: response.status, headers: response.headers, body: parsed };
   }
 
   return {

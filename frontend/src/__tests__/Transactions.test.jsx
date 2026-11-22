@@ -117,6 +117,20 @@ describe("Transactions", () => {
     expect(screen.getByLabelText("Title")).toHaveValue("");
   });
 
+  it("downloads a CSV of everything matching the current filters", async () => {
+    const user = userEvent.setup();
+    renderTransactions();
+
+    const download = await screen.findByRole("link", { name: "Download CSV" });
+    expect(download.getAttribute("href")).toMatch(/\/transactions\/export$/);
+    expect(download).toHaveAttribute("download");
+
+    await user.selectOptions(screen.getByLabelText("Person"), "Bala");
+    await user.type(screen.getByLabelText("To"), "2026-11-30");
+    const filtered = await screen.findByRole("link", { name: "Download filtered CSV" });
+    expect(filtered.getAttribute("href")).toMatch(new RegExp(`/transactions/export\\?to=2026-11-30&person=${bala.id}$`));
+  });
+
   it("only offers the other roommates as people to filter by", async () => {
     renderTransactions();
     const person = screen.getByLabelText("Person");

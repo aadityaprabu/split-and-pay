@@ -1,6 +1,7 @@
 const { pool } = require("../config/db");
 const { Transaction, Validation } = require("../constants/constants");
 const HttpError = require("../models/httpError.model");
+const { toCsv, minorToDecimal } = require("../utils/csv.util");
 
 // "2026-02-31" matches the pattern but isn't a day; a Date rolls it over to March, so the round trip differs
 function isRealDate(value) {
@@ -132,4 +133,66 @@ async function summarizeTransactions(userId, query) {
   return rows;
 }
 
-module.exports = { parseFilters, parseListQuery, escapeLike, listTransactions, summarizeTransactions };
+const EXPORT_HEADER = [
+  "Date",
+  "Title",
+  "Group",
+  "Paid by",
+  "People",
+  "Currency",
+  "Total",
+  "You paid",
+  "Your share",
+  "Notes",
+];
+
+/**
+ * Every expense matching the filters (no paging), newest first, as CSV text.
+ * Amounts are plain decimals so a spreadsheet can add them up; each row has its own currency.
+ */
+async function exportTransactions(userId, query) {
+  const filters = parseFilters(query);
+  const { rows } = await pool.query(
+    `SELECT expenses.spent_on, expenses.description, expenses.currency, expenses.amount_minor, expenses.notes,
+            expenses.paid_by = $1 AS i_paid,
+            payer.name AS payer_name,
+            groups.name AS group_name,
+            COALESCE(my_share.amount_minor, 0) AS my_share_minor,
+            (SELECT string_agg(users.name, '; ' ORDER BY users.name)
+             FROM expense_splits
+             JOIN users ON users.id = expense_splits.user_id
+             WHERE expense_splits.expense_id = expenses.id) AS people
+     FROM expenses
+     JOIN users payer ON payer.id = expenses.paid_by
+     LEFT JOIN groups ON groups.id = expenses.group_id
+     LEFT JOIN expense_splits my_share ON my_share.expense_id = expenses.id AND my_share.user_id = $1
+     WHERE ${MY_FILTERED_EXPENSES}
+     ORDER BY expenses.spent_on DESC, expenses.created_at DESC, expenses.id DESC
+     LIMIT $6`,
+    [...filterParams(userId, filters), Transaction.EXPORT_MAX_ROWS]
+  );
+  return toCsv(
+    EXPORT_HEADER,
+    rows.map((row) => [
+      row.spent_on,
+      row.description,
+      row.group_name,
+      row.i_paid ? "You" : row.payer_name,
+      row.people,
+      row.currency,
+      minorToDecimal(row.amount_minor),
+      minorToDecimal(row.i_paid ? row.amount_minor : 0),
+      minorToDecimal(row.my_share_minor),
+      row.notes,
+    ])
+  );
+}
+
+module.exports = {
+  parseFilters,
+  parseListQuery,
+  escapeLike,
+  listTransactions,
+  summarizeTransactions,
+  exportTransactions,
+};

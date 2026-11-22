@@ -119,6 +119,12 @@ export const XIcon = (props) => (
   </Icon>
 );
 
+export const DownloadIcon = (props) => (
+  <Icon {...props}>
+    <path d="M12 4v11M7 10l5 5 5-5M5 20h14" />
+  </Icon>
+);
+
 export const ArrowLeftIcon = (props) => (
   <Icon {...props}>
     <path d="M19 12H5M11 6l-6 6 6 6" />

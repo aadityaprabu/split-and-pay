@@ -86,6 +86,8 @@ const Transaction = Object.freeze({
   PAGE_SIZE: 10,
   MAX_PAGE_SIZE: 50,
   SEARCH_MAX_LENGTH: 100,
+  // The CSV download is everything matching the filters, up to this many rows
+  EXPORT_MAX_ROWS: 5000,
 });
 
 module.exports = {

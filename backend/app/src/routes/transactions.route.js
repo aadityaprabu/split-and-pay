@@ -8,5 +8,6 @@ router.use("/transactions", requireAuth, requireParticipant);
 
 router.get("/transactions", transactionsController.listTransactions);
 router.get("/transactions/summary", transactionsController.summarizeTransactions);
+router.get("/transactions/export", transactionsController.exportTransactions);
 
 module.exports = router;
