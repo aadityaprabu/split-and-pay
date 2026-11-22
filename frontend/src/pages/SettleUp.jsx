@@ -1,11 +1,12 @@
 import { useId, useState } from "react";
+import { Link } from "react-router-dom";
 import { useAuth } from "../auth/authContext";
 import Avatar from "../components/Avatar";
-import { CheckIcon } from "../components/Icons";
-import { ApiStatus, CurrencyDefault, CurrencyDetails } from "../constants/constants";
+import { CheckIcon, ChevronDownIcon } from "../components/Icons";
+import { ApiStatus, CurrencyDefault, CurrencyDetails, expenseRoute } from "../constants/constants";
 import useApiData from "../hooks/useApiData";
 import api from "../utils/backendApi";
-import { formatDateTime } from "../utils/dates";
+import { formatDateTime, formatDay } from "../utils/dates";
 import { formatMinor, parseHundredths } from "../utils/money";
 
 function describeBalance(balance) {
@@ -158,6 +159,86 @@ function BalanceRow({ balance, onSettle }) {
 }
 
 // Currencies aren't converted, so each one gets its own total: "$40 + ₹1,200"
+// One past payment. A full settle-up opens to list the expenses it settled, each linking to its page.
+function HistoryRow({ settlement, currentUserId }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const listId = useId();
+  const from = settlement.from_user.id === currentUserId ? "You" : settlement.from_user.name;
+  const to = settlement.to_user.id === currentUserId ? "you" : settlement.to_user.name;
+  const expenses = settlement.expenses ?? [];
+  const canOpen = expenses.length > 0;
+  // Every expense a settle-up covers was paid by one of its two people
+  const payerName = (userId) => {
+    if (userId === currentUserId) return "you";
+    return userId === settlement.from_user.id ? settlement.from_user.name : settlement.to_user.name;
+  };
+
+  const summary = (
+    <>
+      <span className="min-w-0">
+        <span className="block truncate">
+          {from} paid {to}
+        </span>
+        <span className="block text-xs text-gray-500">
+          {formatDateTime(settlement.created_at)} ·{" "}
+          {settlement.is_partial
+            ? "part payment"
+            : `settled ${settlement.expense_count} ${settlement.expense_count === 1 ? "expense" : "expenses"}`}
+        </span>
+      </span>
+      <span className="ml-auto font-medium tabular-nums">{formatMinor(settlement.amount_minor, settlement.currency)}</span>
+    </>
+  );
+
+  return (
+    <li className="text-sm">
+      {canOpen ? (
+        <button
+          type="button"
+          onClick={() => setIsOpen((open) => !open)}
+          aria-expanded={isOpen}
+          aria-controls={listId}
+          className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-gray-50"
+        >
+          {summary}
+          <ChevronDownIcon
+            className={`size-4 shrink-0 text-gray-400 transition-transform ${isOpen ? "rotate-180" : ""}`}
+          />
+        </button>
+      ) : (
+        <div className="flex items-center gap-3 px-4 py-3">{summary}</div>
+      )}
+
+      {canOpen && isOpen && (
+        <ul id={listId} className="mx-4 mb-3 divide-y divide-gray-100 rounded-lg bg-gray-50">
+          {expenses.map((expense) => (
+            <li key={expense.id}>
+              <Link
+                to={expenseRoute(expense.id)}
+                className="flex items-center gap-3 px-3 py-2 hover:bg-gray-100"
+              >
+                <span className="min-w-0">
+                  <span className="block truncate font-medium hover:text-primary">{expense.description}</span>
+                  <span className="block text-xs text-gray-500">
+                    {formatDay(expense.spent_on)} · {payerName(expense.paid_by)} paid{" "}
+                    {formatMinor(expense.amount_minor, expense.currency)}
+                  </span>
+                </span>
+                <span className="ml-auto shrink-0 text-right text-xs text-gray-500">
+                  settled
+                  <span className="block text-sm font-medium tabular-nums text-gray-800">
+                    {formatMinor(expense.settled_minor, expense.currency)}
+                  </span>
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </li>
+  );
+}
+
 function SummaryCard({ label, totalsByCurrency, tone }) {
   const totals = Object.entries(totalsByCurrency);
   return (
@@ -261,26 +342,9 @@ export default function SettleUp() {
       {history.data?.length === 0 && <p className="mt-2 text-sm text-gray-500">No payments recorded yet.</p>}
       {history.data?.length > 0 && (
         <ul className="mt-2 divide-y divide-gray-100 rounded-2xl border border-gray-200 bg-white">
-          {history.data.map((settlement) => {
-            const from = settlement.from_user.id === user.id ? "You" : settlement.from_user.name;
-            const to = settlement.to_user.id === user.id ? "you" : settlement.to_user.name;
-            return (
-              <li key={settlement.id} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
-                <div className="min-w-0">
-                  <p className="truncate">
-                    {from} paid {to}
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    {formatDateTime(settlement.created_at)} ·{" "}
-                    {settlement.is_partial
-                      ? "part payment"
-                      : `settled ${settlement.expense_count} ${settlement.expense_count === 1 ? "expense" : "expenses"}`}
-                  </p>
-                </div>
-                <span className="font-medium tabular-nums">{formatMinor(settlement.amount_minor, settlement.currency)}</span>
-              </li>
-            );
-          })}
+          {history.data.map((settlement) => (
+            <HistoryRow key={settlement.id} settlement={settlement} currentUserId={user.id} />
+          ))}
         </ul>
       )}
     </section>

@@ -160,7 +160,20 @@ async function listSettlements(userId) {
             json_build_object('id', payer.id, 'name', payer.name) AS from_user,
             json_build_object('id', receiver.id, 'name', receiver.name) AS to_user,
             (SELECT COUNT(DISTINCT expense_id)::int FROM expense_splits
-             WHERE settlement_id = settlements.id) AS expense_count
+             WHERE settlement_id = settlements.id) AS expense_count,
+            -- What this payment settled: each expense once, with the shares of it that the payment covered
+            (SELECT COALESCE(json_agg(json_build_object(
+                      'id', settled.id, 'description', settled.description, 'spent_on', settled.spent_on,
+                      'currency', settled.currency, 'amount_minor', settled.amount_minor,
+                      'settled_minor', settled.settled_minor, 'paid_by', settled.paid_by
+                    ) ORDER BY settled.spent_on DESC, settled.created_at DESC), '[]')
+             FROM (SELECT expenses.id, expenses.description, expenses.spent_on, expenses.currency,
+                          expenses.amount_minor, expenses.paid_by, expenses.created_at,
+                          SUM(expense_splits.amount_minor)::bigint AS settled_minor
+                   FROM expense_splits
+                   JOIN expenses ON expenses.id = expense_splits.expense_id
+                   WHERE expense_splits.settlement_id = settlements.id
+                   GROUP BY expenses.id) AS settled) AS expenses
      FROM settlements
      JOIN users payer ON payer.id = settlements.from_user
      JOIN users receiver ON receiver.id = settlements.to_user

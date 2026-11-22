@@ -47,8 +47,8 @@ test("balances net out expenses in both directions, per currency", async () => {
 test("settling up records the net payment and marks every share between the two as settled", async () => {
   const { asha, bala } = await setup();
   const both = [asha.user.id, bala.user.id];
-  await addEqualExpense(asha.client, asha.user.id, both, 3000);
-  await addEqualExpense(bala.client, bala.user.id, both, 1000);
+  const ashaPaidId = await addEqualExpense(asha.client, asha.user.id, both, 3000);
+  const balaPaidId = await addEqualExpense(bala.client, bala.user.id, both, 1000);
 
   const settled = await bala.client.post("/settlements", { user_id: asha.user.id, currency: "USD", net_minor: -1000 });
   assert.equal(settled.status, 201);
@@ -63,6 +63,14 @@ test("settling up records the net payment and marks every share between the two 
   assert.deepEqual(
     history.map((entry) => [entry.from_user.name, entry.to_user.name, entry.amount_minor, entry.expense_count]),
     [["Bala", "Asha", 1000, 2]]
+  );
+  // Each expense it settled, with the share of it the payment covered (the payer's own share was never owed)
+  assert.deepEqual(
+    history[0].expenses.map((expense) => [expense.id, expense.amount_minor, expense.settled_minor, expense.paid_by]).sort(),
+    [
+      [ashaPaidId, 3000, 1500, asha.user.id],
+      [balaPaidId, 1000, 500, bala.user.id],
+    ].sort()
   );
 
   const again = await bala.client.post("/settlements", { user_id: asha.user.id, currency: "USD", net_minor: 0 });

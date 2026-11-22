@@ -38,6 +38,20 @@ function renderSettleUp() {
             from_user: me,
             to_user: bala,
           },
+          {
+            id: "s2",
+            amount_minor: 2025,
+            currency: "USD",
+            created_at: "2026-11-22T07:09:00Z",
+            is_partial: false,
+            expense_count: 2,
+            from_user: me,
+            to_user: bala,
+            expenses: [
+              { id: "e1", description: "Dinner", spent_on: "2026-11-21", currency: "USD", amount_minor: 3000, settled_minor: 1500, paid_by: bala.id },
+              { id: "e2", description: "Cab", spent_on: "2026-11-20", currency: "USD", amount_minor: 1050, settled_minor: 525, paid_by: bala.id },
+            ],
+          },
         ],
       };
     }
@@ -54,6 +68,30 @@ function renderSettleUp() {
 
 describe("SettleUp", () => {
   beforeEach(() => vi.clearAllMocks());
+
+  it("opens a past settle-up to list the expenses it settled, each linking to its page", async () => {
+    const user = userEvent.setup();
+    renderSettleUp();
+
+    const row = await screen.findByRole("button", { name: /You paid Bala.*settled 2 expenses/ });
+    expect(row).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("link", { name: /Dinner/ })).not.toBeInTheDocument();
+
+    await user.click(row);
+    expect(row).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("link", { name: /Dinner/ })).toHaveAttribute("href", "/expenses/e1");
+    expect(screen.getByRole("link", { name: /Cab/ })).toHaveAttribute("href", "/expenses/e2");
+    expect(screen.getByRole("link", { name: /Dinner/ })).toHaveTextContent("Bala paid $30");
+
+    await user.click(row);
+    expect(screen.queryByRole("link", { name: /Dinner/ })).not.toBeInTheDocument();
+  });
+
+  it("doesn't offer to open a part payment, which settled no expenses", async () => {
+    renderSettleUp();
+    await screen.findByText(/part payment/);
+    expect(screen.queryByRole("button", { name: /part payment/ })).not.toBeInTheDocument();
+  });
 
   it("records a part payment and refuses more than what's owed", async () => {
     api.post.mockResolvedValue({ status: "success", data: { is_partial: true, amount_minor: 400 } });
