@@ -14,6 +14,12 @@ export function formatDay(isoDate) {
   return date.toLocaleDateString("en-IN", options);
 }
 
+/** "2026-09" → "September 2026" */
+export function formatMonth(isoMonth) {
+  const [year, month] = isoMonth.split("-").map(Number);
+  return new Date(year, month - 1, 1).toLocaleDateString("en-IN", { month: "long", year: "numeric" });
+}
+
 /** A timestamp → "20 Sep, 7:45 pm" */
 export function formatDateTime(timestamp) {
   return new Date(timestamp).toLocaleString("en-IN", {

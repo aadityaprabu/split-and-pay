@@ -16,6 +16,7 @@ export const ApiStatus = Object.freeze({
 export const AppRoute = Object.freeze({
   EXPENSES: "/expenses",
   NEW_EXPENSE: "/expenses/new",
+  TRANSACTIONS: "/transactions",
   SETTLE_UP: "/settle-up",
   ADMIN: "/admin",
 });
@@ -49,6 +50,12 @@ export const SplitType = Object.freeze({
 export const Percent = Object.freeze({
   // Percentages travel as basis points (hundredths of a percent): 33.33% is 3333
   TOTAL_BASIS_POINTS: 10_000,
+});
+
+// The "My transactions" page: pages of 10, and the title search waits for a pause in typing
+export const Transactions = Object.freeze({
+  PAGE_SIZE: 10,
+  SEARCH_DEBOUNCE_MS: 300,
 });
 
 export const Expense = Object.freeze({

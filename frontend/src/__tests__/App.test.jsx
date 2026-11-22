@@ -69,6 +69,7 @@ describe("App", () => {
     expect(await screen.findByRole("button", { name: /Roomie/ })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Add an expense/ })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Settle up/ })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /My transactions/ })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Create an expense/ })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /Manage access/ })).not.toBeInTheDocument();
   });

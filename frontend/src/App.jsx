@@ -5,6 +5,7 @@ import Admin from "./pages/Admin";
 import Dashboard from "./pages/Dashboard";
 import Login from "./pages/Login";
 import SettleUp from "./pages/SettleUp";
+import Transactions from "./pages/Transactions";
 import CreateExpense from "./pages/expenses/CreateExpense";
 import Expenses from "./pages/expenses/Expenses";
 
@@ -30,6 +31,7 @@ export default function App() {
           <>
             <Route path={AppRoute.EXPENSES} element={<Expenses />} />
             <Route path={AppRoute.NEW_EXPENSE} element={<CreateExpense />} />
+            <Route path={AppRoute.TRANSACTIONS} element={<Transactions />} />
             <Route path={AppRoute.SETTLE_UP} element={<SettleUp />} />
           </>
         )}

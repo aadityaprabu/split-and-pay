@@ -244,6 +244,10 @@ Removing someone from the list signs them out immediately. Their past expenses s
   The split step shows each person's share live, and you can only submit once it adds up exactly.
 - **Expense cards** show who paid, each person's share, and a **Paid**, **Owes** or **Settled** status.
   Whoever added or paid for an expense can delete it, until someone has settled part of it.
+- **My transactions** lists only the expenses you paid for or have a share in, newest first, 10 at a
+  time (**Show more**, then **Load more**). A monthly summary above it shows, per month and currency,
+  how many there were, how much you paid and how much was your share. Filter both by date range, by
+  part of the title, or by a person who was on the expense with you.
 - **Settle up** shows your net balance with each person, per currency. **Settle up → Confirm** records
   the payment and marks the shared expenses between the two of you as settled. If someone adds an expense
   while you're looking, the app refuses the old amount and shows the new one.
@@ -290,7 +294,7 @@ yarn build                # production build of the frontend
 |---|---|---|
 | Backend unit (`node:test`) | next to the code: `backend/app/src/**/<name>.<kind>.test.js` | split math, input validation, sign-in rules |
 | Backend integration | `backend/app/test/integration/` | the real app over HTTP against a real Postgres: sign-in, access control, expenses, balances, settle-ups (including simultaneous ones) |
-| Frontend (Vitest + React Testing Library) | `frontend/src/__tests__/` | dashboard, user menu, the create-expense flow, money and split helpers |
+| Frontend (Vitest + React Testing Library) | `frontend/src/__tests__/` | dashboard, user menu, the create-expense flow, my transactions, money and split helpers |
 
 The integration tests start a **throwaway** Postgres container on a free port and always remove it
 afterwards, so your dev database is never touched. Only Google's signature check is faked. A full run
