@@ -33,6 +33,7 @@ const SplitType = Object.freeze({
 
 const Expense = Object.freeze({
   DESCRIPTION_MAX_LENGTH: 100,
+  NOTES_MAX_LENGTH: 1000,
   MAX_AMOUNT_MINOR: 10_000_000_00, // 1,00,00,000.00 in minor units (cents / paise)
   LIST_LIMIT: 200,
 });
@@ -63,6 +64,23 @@ const Settlement = Object.freeze({
   HISTORY_LIMIT: 50,
 });
 
+const Group = Object.freeze({
+  NAME_MAX_LENGTH: 50,
+});
+
+const Comment = Object.freeze({
+  BODY_MAX_LENGTH: 1000,
+});
+
+// Receipts are for reference only. The app shrinks photos to well under this before uploading.
+const Attachment = Object.freeze({
+  MAX_BYTES: 5 * 1024 * 1024,
+  MAX_PER_EXPENSE: 5,
+  FILE_NAME_MAX_LENGTH: 200,
+  // Checked against the file's first bytes, never trusted from the request
+  CONTENT_TYPES: Object.freeze(["image/jpeg", "image/png", "image/webp", "application/pdf"]),
+});
+
 module.exports = {
   EnvironmentName,
   Server,
@@ -76,4 +94,7 @@ module.exports = {
   CurrencyLocale,
   Percent,
   Settlement,
+  Group,
+  Comment,
+  Attachment,
 };

@@ -26,6 +26,7 @@ function mockBackend({ me, googleClientId = null }) {
     if (endpoint === "/auth/me") return me;
     if (endpoint === "/auth/config") return { status: "success", data: { googleClientId } };
     if (endpoint === "/expenses") return { status: "success", data: [] };
+    if (endpoint === "/groups") return { status: "success", data: [] };
     if (endpoint === "/admin/allowed-emails") {
       return { status: "success", data: { adminEmail: admin.email, allowedEmails: [] } };
     }

@@ -3,9 +3,11 @@ import { useAuth } from "./auth/authContext";
 import { AppRoute } from "./constants/constants";
 import Admin from "./pages/Admin";
 import Dashboard from "./pages/Dashboard";
+import Groups from "./pages/Groups";
 import Login from "./pages/Login";
 import SettleUp from "./pages/SettleUp";
 import CreateExpense from "./pages/expenses/CreateExpense";
+import ExpenseDetail from "./pages/expenses/ExpenseDetail";
 import Expenses from "./pages/expenses/Expenses";
 
 export default function App() {
@@ -30,6 +32,9 @@ export default function App() {
           <>
             <Route path={AppRoute.EXPENSES} element={<Expenses />} />
             <Route path={AppRoute.NEW_EXPENSE} element={<CreateExpense />} />
+            <Route path={AppRoute.EXPENSE} element={<ExpenseDetail />} />
+            <Route path={AppRoute.EDIT_EXPENSE} element={<CreateExpense />} />
+            <Route path={AppRoute.GROUPS} element={<Groups />} />
             <Route path={AppRoute.SETTLE_UP} element={<SettleUp />} />
           </>
         )}

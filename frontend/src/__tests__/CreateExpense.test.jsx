@@ -6,18 +6,34 @@ import { AuthContext } from "../auth/authContext";
 import CreateExpense from "../pages/expenses/CreateExpense";
 import api from "../utils/backendApi";
 
-vi.mock("../utils/backendApi", () => ({ default: { get: vi.fn(), post: vi.fn(), delete: vi.fn() } }));
+vi.mock("../utils/backendApi", () => ({
+  default: { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn(), upload: vi.fn() },
+}));
 
 const me = { id: "0199a0c0-0000-7000-8000-00000000000a", name: "Asha", email: "asha@gmail.com", picture_url: null };
 const bala = { id: "0199a0c0-0000-7000-8000-00000000000b", name: "Bala", email: "bala@gmail.com", picture_url: null };
 const chitra = { id: "0199a0c0-0000-7000-8000-00000000000c", name: "Chitra", email: "chitra@gmail.com", picture_url: null };
 
-function renderCreateExpense() {
+const trip = { id: "0199a0c0-0000-7000-8000-0000000000f1", name: "Goa trip", members: [me, bala] };
+
+// Answers api.get by endpoint, like the backend would
+function mockBackend({ groups = [], expense = null } = {}) {
+  api.get.mockImplementation(async (endpoint) => {
+    if (endpoint === "/users") return { status: "success", data: [me, bala, chitra] };
+    if (endpoint === "/groups") return { status: "success", data: groups };
+    if (expense && endpoint === `/expenses/${expense.id}`) return { status: "success", data: expense };
+    throw new Error(`unexpected GET ${endpoint}`);
+  });
+}
+
+function renderCreateExpense(path = "/expenses/new") {
   return render(
     <AuthContext.Provider value={{ user: { ...me, is_admin: false } }}>
-      <MemoryRouter initialEntries={["/expenses/new"]}>
+      <MemoryRouter initialEntries={[path]}>
         <Routes>
           <Route path="/expenses/new" element={<CreateExpense />} />
+          <Route path="/expenses/:id/edit" element={<CreateExpense />} />
+          <Route path="/expenses/:id" element={<p>Expense page</p>} />
           <Route path="/expenses" element={<p>Expenses list</p>} />
         </Routes>
       </MemoryRouter>
@@ -39,7 +55,7 @@ async function fillParticipantsAndAmount(user, { names, description, amount, cur
 describe("CreateExpense", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    api.get.mockResolvedValue({ status: "success", data: [me, bala, chitra] });
+    mockBackend();
     api.post.mockResolvedValue({ status: "success", data: { id: "new" } });
   });
 
@@ -112,5 +128,92 @@ describe("CreateExpense", () => {
 
     expect(api.post).toHaveBeenCalledWith("/expenses", expect.objectContaining({ currency: "INR" }));
     expect(await screen.findByText("Someone on this expense can no longer sign in")).toBeInTheDocument();
+  });
+
+  it("saves notes, and uploads a picked receipt once the expense exists", async () => {
+    api.upload.mockResolvedValue({ status: "success", data: { id: "file" } });
+    const user = userEvent.setup();
+    renderCreateExpense();
+
+    await user.click(await screen.findByRole("checkbox", { name: /Bala/ }));
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    await user.type(screen.getByLabelText("Description"), "Groceries");
+    await user.type(screen.getByLabelText("Amount"), "100");
+    await user.type(screen.getByLabelText(/Notes/), "Includes the bags");
+    const bill = new File(["%PDF-1.7"], "bill.pdf", { type: "application/pdf" });
+    await user.upload(screen.getByTestId("receipt-input"), bill);
+    expect(screen.getByText("bill.pdf")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    await user.click(screen.getByRole("button", { name: "Create expense" }));
+
+    expect(api.post).toHaveBeenCalledWith("/expenses", expect.objectContaining({ notes: "Includes the bags" }));
+    expect(api.upload).toHaveBeenCalledWith("/expenses/new/attachments", bill, "bill.pdf");
+    expect(await screen.findByText("Expenses list")).toBeInTheDocument();
+  });
+
+  it("only lists a group's members once a group is picked", async () => {
+    mockBackend({ groups: [trip] });
+    const user = userEvent.setup();
+    renderCreateExpense();
+
+    await user.selectOptions(await screen.findByLabelText("Group"), "Goa trip");
+    expect(screen.getByRole("checkbox", { name: /Bala/ })).toBeInTheDocument();
+    expect(screen.queryByRole("checkbox", { name: /Chitra/ })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("checkbox", { name: /Bala/ }));
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    await user.type(screen.getByLabelText("Description"), "Hotel");
+    await user.type(screen.getByLabelText("Amount"), "300");
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    await user.click(screen.getByRole("button", { name: "Create expense" }));
+
+    expect(api.post).toHaveBeenCalledWith("/expenses", expect.objectContaining({ group_id: trip.id }));
+  });
+
+  it("edits an expense: starts from what was saved and sends a PUT", async () => {
+    const expense = {
+      id: "0199a0c0-0000-7000-8000-0000000000e1",
+      description: "Rent",
+      amount_minor: 20000,
+      currency: "USD",
+      split_type: "percent",
+      spent_on: "2026-11-01",
+      notes: "November",
+      group: null,
+      paid_by: { id: me.id, name: me.name },
+      splits: [
+        { user_id: me.id, amount_minor: 12000, basis_points: 6000, settlement_id: null },
+        { user_id: bala.id, amount_minor: 8000, basis_points: 4000, settlement_id: null },
+      ],
+    };
+    mockBackend({ expense });
+    api.put.mockResolvedValue({ status: "success", data: { id: expense.id } });
+    const user = userEvent.setup();
+    renderCreateExpense(`/expenses/${expense.id}/edit`);
+
+    expect(await screen.findByRole("heading", { name: "Edit expense" })).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: /Bala/ })).toBeChecked();
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    expect(screen.getByLabelText("Description")).toHaveValue("Rent");
+    expect(screen.getByLabelText("Amount")).toHaveValue("200");
+    const description = screen.getByLabelText("Description");
+    await user.clear(description);
+    await user.type(description, "Rent (November)");
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    expect(screen.getByLabelText("Asha's percentage")).toHaveValue("60");
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+
+    expect(api.put).toHaveBeenCalledWith(
+      `/expenses/${expense.id}`,
+      expect.objectContaining({
+        description: "Rent (November)",
+        notes: "November",
+        participants: [
+          { user_id: me.id, basis_points: 6000 },
+          { user_id: bala.id, basis_points: 4000 },
+        ],
+      }),
+    );
+    expect(await screen.findByText("Expense page")).toBeInTheDocument();
   });
 });

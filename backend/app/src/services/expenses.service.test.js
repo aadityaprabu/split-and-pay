@@ -40,6 +40,8 @@ test("each broken field is rejected with a 400", () => {
     "nobody to split with": { participants: [] },
     "participant isn't a uuid": { participants: [{ user_id: "1; DROP TABLE users" }] },
     "same person twice": { participants: [{ user_id: alice }, { user_id: alice.toUpperCase() }] },
+    "long notes": { notes: "x".repeat(1001) },
+    "group isn't a uuid": { group_id: "flat" },
   };
 
   for (const [name, override] of Object.entries(brokenBodies)) {
@@ -53,4 +55,15 @@ test("INR is accepted", () => {
 
 test("a real date is accepted", () => {
   assert.equal(parseExpenseInput({ ...validBody(), spent_on: "2028-02-29" }).spentOn, "2028-02-29");
+});
+
+test("notes are trimmed, and blank notes are left out", () => {
+  assert.equal(parseExpenseInput({ ...validBody(), notes: "  Split the delivery fee too " }).notes, "Split the delivery fee too");
+  assert.equal(parseExpenseInput({ ...validBody(), notes: "   " }).notes, null);
+  assert.equal(parseExpenseInput(validBody()).notes, null);
+});
+
+test("a group id is optional and lower-cased", () => {
+  assert.equal(parseExpenseInput(validBody()).groupId, null);
+  assert.equal(parseExpenseInput({ ...validBody(), group_id: alice.toUpperCase() }).groupId, alice);
 });

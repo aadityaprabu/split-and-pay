@@ -1,12 +1,12 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import { useAuth } from "../auth/authContext";
 import Avatar from "../components/Avatar";
 import { CheckIcon } from "../components/Icons";
-import { ApiStatus, CurrencyDefault } from "../constants/constants";
+import { ApiStatus, CurrencyDefault, CurrencyDetails } from "../constants/constants";
 import useApiData from "../hooks/useApiData";
 import api from "../utils/backendApi";
 import { formatDateTime } from "../utils/dates";
-import { formatMinor } from "../utils/money";
+import { formatMinor, parseHundredths } from "../utils/money";
 
 function describeBalance(balance) {
   if (balance.net_minor > 0) return { text: `${balance.name} owes you`, tone: "text-green-700" };
@@ -15,23 +15,46 @@ function describeBalance(balance) {
 }
 
 // What gets recorded when settling, phrased as the real-world payment
-function describePayment(balance) {
-  const amount = formatMinor(Math.abs(balance.net_minor), balance.currency);
+function describePayment(balance, amountMinor) {
+  const amount = formatMinor(amountMinor, balance.currency);
   if (balance.net_minor > 0) return `Record that ${balance.name} paid you ${amount}?`;
   if (balance.net_minor < 0) return `Record that you paid ${balance.name} ${amount}?`;
   return `Your ${balance.currency} shares with ${balance.name} cancel out. Mark them all as settled?`;
 }
 
+const PaymentMode = Object.freeze({ FULL: "full", PART: "part" });
+
 function BalanceRow({ balance, onSettle }) {
   const [isConfirming, setIsConfirming] = useState(false);
+  const [mode, setMode] = useState(PaymentMode.FULL);
+  const [partText, setPartText] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const amountInputId = useId();
   const { text, tone } = describeBalance(balance);
+  const owedMinor = Math.abs(balance.net_minor);
+
+  const partMinor = parseHundredths(partText);
+  const partError =
+    mode !== PaymentMode.PART
+      ? null
+      : partMinor === null || partMinor <= 0
+        ? "Enter how much was paid"
+        : partMinor > owedMinor
+          ? `That's more than the ${formatMinor(owedMinor, balance.currency)} owed`
+          : null;
+  const amountMinor = mode === PaymentMode.PART ? partMinor : owedMinor;
+
+  const close = () => {
+    setIsConfirming(false);
+    setMode(PaymentMode.FULL);
+    setPartText("");
+  };
 
   const confirm = async () => {
     setIsSaving(true);
-    await onSettle(balance);
+    await onSettle(balance, mode === PaymentMode.PART ? partMinor : null);
     setIsSaving(false);
-    setIsConfirming(false);
+    close();
   };
 
   return (
@@ -42,9 +65,11 @@ function BalanceRow({ balance, onSettle }) {
           <p className={`text-sm font-medium ${tone}`}>{text}</p>
           <p className="text-xs text-gray-500">
             {balance.open_expense_count} open {balance.open_expense_count === 1 ? "expense" : "expenses"}
+            {balance.partial_paid_minor > 0 &&
+              ` · ${formatMinor(balance.partial_paid_minor, balance.currency)} paid in part`}
           </p>
         </div>
-        <p className={`font-semibold tabular-nums ${tone}`}>{formatMinor(Math.abs(balance.net_minor), balance.currency)}</p>
+        <p className={`font-semibold tabular-nums ${tone}`}>{formatMinor(owedMinor, balance.currency)}</p>
         {!isConfirming && (
           <button
             type="button"
@@ -57,24 +82,75 @@ function BalanceRow({ balance, onSettle }) {
       </div>
 
       {isConfirming && (
-        <div className="mt-3 flex flex-wrap items-center justify-end gap-2 rounded-lg bg-gray-50 p-3">
-          <p className="mr-auto text-sm">{describePayment(balance)}</p>
-          <button
-            type="button"
-            onClick={() => setIsConfirming(false)}
-            disabled={isSaving}
-            className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm hover:bg-gray-50"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={confirm}
-            disabled={isSaving}
-            className="rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
-          >
-            {isSaving ? "Saving..." : "Confirm"}
-          </button>
+        <div className="mt-3 space-y-3 rounded-lg bg-gray-50 p-3">
+          {owedMinor > 0 && (
+            <div role="radiogroup" aria-label="How much was paid" className="inline-flex rounded-lg bg-gray-200/70 p-0.5">
+              {[
+                [PaymentMode.FULL, "Full amount"],
+                [PaymentMode.PART, "Part of it"],
+              ].map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  role="radio"
+                  aria-checked={mode === value}
+                  onClick={() => setMode(value)}
+                  className={`rounded-md px-3 py-1 text-sm font-medium transition-colors ${
+                    mode === value ? "bg-white text-primary shadow-sm" : "text-gray-600 hover:text-gray-900"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+          {mode === PaymentMode.PART && (
+            <div>
+              <label htmlFor={amountInputId} className="text-sm font-medium">
+                Amount paid
+              </label>
+              <div className="relative mt-1 w-40">
+                <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-gray-500">
+                  {CurrencyDetails[balance.currency].SYMBOL}
+                </span>
+                <input
+                  id={amountInputId}
+                  type="text"
+                  inputMode="decimal"
+                  value={partText}
+                  onChange={(event) => setPartText(event.target.value)}
+                  placeholder="0.00"
+                  autoFocus
+                  className="w-full rounded-lg border border-gray-300 bg-white py-1.5 pr-3 pl-7 text-right tabular-nums focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none"
+                />
+              </div>
+              <span className="mt-1 block text-xs text-gray-500">
+                {partError ??
+                  (partMinor === owedMinor
+                    ? "That's everything, so it settles up in full."
+                    : `${formatMinor(owedMinor - partMinor, balance.currency)} will still be owed. The expenses stay open until it's all paid.`)}
+              </span>
+            </div>
+          )}
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <p className="mr-auto text-sm">{partError ? "\u00a0" : describePayment(balance, amountMinor)}</p>
+            <button
+              type="button"
+              onClick={close}
+              disabled={isSaving}
+              className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={confirm}
+              disabled={isSaving || Boolean(partError)}
+              className="rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+            >
+              {isSaving ? "Saving..." : "Confirm"}
+            </button>
+          </div>
         </div>
       )}
     </li>
@@ -116,16 +192,22 @@ export default function SettleUp() {
   const [actionError, setActionError] = useState(null);
   const [lastSettledName, setLastSettledName] = useState(null);
 
-  const settle = async (balance) => {
+  // partMinor is null to settle everything, or the amount of a part payment
+  const settle = async (balance, partMinor) => {
     setActionError(null);
     setLastSettledName(null);
     const result = await api.post("/settlements", {
       user_id: balance.user_id,
       currency: balance.currency,
       net_minor: balance.net_minor,
+      ...(partMinor !== null && { amount_minor: partMinor }),
     });
     if (result.status === ApiStatus.SUCCESS) {
-      setLastSettledName(balance.name);
+      setLastSettledName(
+        result.data?.is_partial
+          ? `Recorded a ${formatMinor(result.data.amount_minor, balance.currency)} payment with ${balance.name}`
+          : `Settled up with ${balance.name}`,
+      );
     } else {
       setActionError(result.message);
     }
@@ -156,7 +238,7 @@ export default function SettleUp() {
       {lastSettledName && (
         <p className="mt-4 inline-flex items-center gap-1 text-sm text-green-700">
           <CheckIcon className="size-4" />
-          Settled up with {lastSettledName}
+          {lastSettledName}
         </p>
       )}
 
@@ -189,8 +271,10 @@ export default function SettleUp() {
                     {from} paid {to}
                   </p>
                   <p className="text-xs text-gray-500">
-                    {formatDateTime(settlement.created_at)} · settled {settlement.expense_count}{" "}
-                    {settlement.expense_count === 1 ? "expense" : "expenses"}
+                    {formatDateTime(settlement.created_at)} ·{" "}
+                    {settlement.is_partial
+                      ? "part payment"
+                      : `settled ${settlement.expense_count} ${settlement.expense_count === 1 ? "expense" : "expenses"}`}
                   </p>
                 </div>
                 <span className="font-medium tabular-nums">{formatMinor(settlement.amount_minor, settlement.currency)}</span>

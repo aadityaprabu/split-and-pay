@@ -10,7 +10,9 @@ const { pool } = require("../../src/config/db");
 const runMigrations = require("../../src/database/migrate");
 const setupApp = require("../../src/setup");
 
-const ALL_TABLES = "users, sessions, allowed_emails, expenses, expense_splits, settlements";
+const ALL_TABLES =
+  "users, sessions, allowed_emails, groups, group_members, expenses, expense_splits, expense_comments, " +
+  "expense_attachments, settlements";
 
 /**
  * Registers before/after hooks for a test file and returns { baseUrl } once the server is up.
@@ -48,15 +50,17 @@ function useTestServer() {
 function createClient(context) {
   let sessionCookie = null;
 
-  async function request(method, endpoint, body) {
-    const headers = {};
-    if (body !== undefined) headers["Content-Type"] = "application/json";
+  // A Buffer body is sent as raw bytes (file uploads); anything else as JSON
+  async function request(method, endpoint, body, extraHeaders = {}) {
+    const headers = { ...extraHeaders };
+    const isRaw = Buffer.isBuffer(body);
+    if (body !== undefined && !isRaw) headers["Content-Type"] = "application/json";
     if (sessionCookie) headers.Cookie = sessionCookie;
 
     const response = await fetch(context.baseUrl + endpoint, {
       method,
       headers,
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body: body === undefined || isRaw ? body : JSON.stringify(body),
     });
 
     for (const cookie of response.headers.getSetCookie()) {
@@ -65,6 +69,9 @@ function createClient(context) {
       if (name === Session.COOKIE_NAME) sessionCookie = value ? `${name}=${value}` : null;
     }
 
+    if (!(response.headers.get("content-type") ?? "").match(/json|text/)) {
+      return { status: response.status, headers: response.headers, body: Buffer.from(await response.arrayBuffer()) };
+    }
     const text = await response.text();
     let parsed = text;
     try {
@@ -78,6 +85,9 @@ function createClient(context) {
   return {
     get: (endpoint) => request("GET", endpoint),
     post: (endpoint, body = {}) => request("POST", endpoint, body),
+    put: (endpoint, body = {}) => request("PUT", endpoint, body),
+    upload: (endpoint, bytes, fileName, contentType = "application/octet-stream") =>
+      request("POST", endpoint, bytes, { "Content-Type": contentType, "X-File-Name": encodeURIComponent(fileName) }),
     delete: (endpoint) => request("DELETE", endpoint),
   };
 }

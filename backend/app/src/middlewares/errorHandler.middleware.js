@@ -8,7 +8,9 @@ const errorHandler = (error, req, res, _next) => {
   const statusCode = error.statusCode || 500;
   // Our own HttpErrors are written for users; anything else 5xx may leak internals
   const isSafeToShow = error instanceof HttpError || statusCode < 500;
-  const message = isSafeToShow ? error.message : "internal server error";
+  let message = isSafeToShow ? error.message : "internal server error";
+  // body-parser's own wording; this is what someone uploading a big photo or file should read
+  if (error.type === "entity.too.large") message = "That's too big to upload";
   res.status(statusCode).json(response.error(message, statusCode));
 };
 

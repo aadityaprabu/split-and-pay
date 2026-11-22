@@ -55,6 +55,8 @@ server {
     # ${BACKEND_URL}/<route> → backend /api/<route>
     location ${BACKEND_URL}/ {
         limit_req zone=backend_limit burst=20 nodelay;
+        # Receipt uploads: the backend allows 5 MB per file (Attachment.MAX_BYTES) and gives the friendly error
+        client_max_body_size 6m;
 
         proxy_pass http://backend:${BACKEND_PORT}/api/;
         proxy_set_header Host $host;

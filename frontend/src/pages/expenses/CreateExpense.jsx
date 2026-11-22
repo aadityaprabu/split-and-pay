@@ -1,12 +1,22 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useRef, useState } from "react";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../../auth/authContext";
 import Avatar from "../../components/Avatar";
-import { CheckIcon } from "../../components/Icons";
-import { ApiStatus, AppRoute, CurrencyDefault, CurrencyDetails, Expense, SplitType } from "../../constants/constants";
+import { CheckIcon, FileIcon, PaperclipIcon, XIcon } from "../../components/Icons";
+import {
+  ApiStatus,
+  AppRoute,
+  Attachment,
+  CurrencyDefault,
+  CurrencyDetails,
+  Expense,
+  SplitType,
+  expenseRoute,
+} from "../../constants/constants";
 import useApiData from "../../hooks/useApiData";
 import api from "../../utils/backendApi";
 import { todayIso } from "../../utils/dates";
+import { formatBytes, uploadReceipt } from "../../utils/files";
 import { formatMinor, hundredthsToText, parseHundredths } from "../../utils/money";
 import { equalBasisPoints, previewShares } from "../../utils/splits";
 
@@ -45,10 +55,23 @@ function StepIndicator({ currentStep }) {
   );
 }
 
-function ParticipantsStep({ users, currentUserId, selectedIds, onToggle, onToggleAll }) {
-  const allSelected = selectedIds.length === users.length;
+function ParticipantsStep({ users, groups, groupId, onGroupChange, currentUserId, selectedIds, onToggle, onToggleAll }) {
+  const allSelected = users.every((person) => selectedIds.includes(person.id));
   return (
     <>
+      {groups.length > 0 && (
+        <label className="mb-5 block">
+          <span className="text-sm font-medium">Group</span>
+          <select value={groupId} onChange={(event) => onGroupChange(event.target.value)} className={`mt-1 ${inputClasses}`}>
+            <option value="">No group (the whole flat)</option>
+            {groups.map((group) => (
+              <option key={group.id} value={group.id}>
+                {group.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Who's splitting this?</h2>
         <button type="button" onClick={onToggleAll} className="text-sm font-medium text-primary hover:underline">
@@ -81,13 +104,73 @@ function ParticipantsStep({ users, currentUserId, selectedIds, onToggle, onToggl
         })}
       </ul>
       <p className="mt-2 text-xs text-gray-500">
-        Roommates show up here once they've signed in for the first time.
+        {groupId
+          ? "Only the group's members are listed. Change who's in it from the Groups page."
+          : "Roommates show up here once they've signed in for the first time."}
       </p>
     </>
   );
 }
 
-function AmountStep({ users, currentUserId, details, onChange }) {
+// Receipts picked before the expense exists; they're uploaded right after it's created
+function PendingReceipts({ files, onAdd, onRemove }) {
+  const inputRef = useRef(null);
+  return (
+    <div className="sm:col-span-2">
+      <span className="text-sm font-medium">
+        Receipt <span className="font-normal text-gray-500">(optional, for reference)</span>
+      </span>
+      {files.length > 0 && (
+        <ul className="mt-2 space-y-1.5">
+          {files.map((file, index) => (
+            <li
+              key={`${file.name}-${index}`}
+              className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"
+            >
+              <FileIcon className="size-4 shrink-0 text-gray-400" />
+              <span className="min-w-0 flex-1 truncate">{file.name}</span>
+              <span className="text-xs text-gray-400 tabular-nums">{formatBytes(file.size)}</span>
+              <button
+                type="button"
+                onClick={() => onRemove(index)}
+                aria-label={`Remove ${file.name}`}
+                className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+              >
+                <XIcon className="size-4" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {files.length < Attachment.MAX_PER_EXPENSE && (
+        <>
+          <button
+            type="button"
+            onClick={() => inputRef.current?.click()}
+            className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-dashed border-gray-300 bg-white px-3 py-2 text-sm text-gray-600 hover:border-primary hover:text-primary"
+          >
+            <PaperclipIcon className="size-4" />
+            Attach a photo or PDF of the bill
+          </button>
+          <input
+            ref={inputRef}
+            type="file"
+            accept={Attachment.ACCEPT}
+            multiple
+            hidden
+            data-testid="receipt-input"
+            onChange={(event) => {
+              onAdd([...event.target.files]);
+              event.target.value = "";
+            }}
+          />
+        </>
+      )}
+    </div>
+  );
+}
+
+function AmountStep({ users, currentUserId, details, onChange, isEditing, pendingFiles, onAddFiles, onRemoveFile }) {
   return (
     <>
       <h2 className="text-lg font-semibold">What was it, and how much?</h2>
@@ -155,6 +238,20 @@ function AmountStep({ users, currentUserId, details, onChange }) {
             className={`mt-1 ${inputClasses}`}
           />
         </label>
+        <label className="sm:col-span-2">
+          <span className="text-sm font-medium">
+            Notes <span className="font-normal text-gray-500">(optional)</span>
+          </span>
+          <textarea
+            value={details.notes}
+            onChange={(event) => onChange({ notes: event.target.value })}
+            maxLength={Expense.NOTES_MAX_LENGTH}
+            rows={2}
+            placeholder="Anything worth remembering: what was included, who to remind..."
+            className={`mt-1 resize-y ${inputClasses}`}
+          />
+        </label>
+        {!isEditing && <PendingReceipts files={pendingFiles} onAdd={onAddFiles} onRemove={onRemoveFile} />}
       </div>
     </>
   );
@@ -233,26 +330,67 @@ function SplitStep({ participants, currentUserId, amountMinor, currency, split, 
   );
 }
 
-export default function CreateExpense() {
+// What the form starts with: empty for a new expense, the saved values when editing
+function initialFormState(expense, userId, groupId) {
+  if (!expense) {
+    return {
+      selectedIds: [userId],
+      details: {
+        description: "",
+        amountText: "",
+        currency: CurrencyDefault.CODE,
+        paidBy: userId,
+        spentOn: todayIso(),
+        notes: "",
+        groupId: groupId ?? "",
+      },
+      split: { type: SplitType.EQUAL, percentTexts: {}, exactTexts: {} },
+    };
+  }
+  const textsBy = (field) =>
+    Object.fromEntries(
+      expense.splits.filter((share) => share[field] !== null).map((share) => [share.user_id, hundredthsToText(share[field])]),
+    );
+  return {
+    selectedIds: expense.splits.map((share) => share.user_id),
+    details: {
+      description: expense.description,
+      amountText: hundredthsToText(expense.amount_minor),
+      currency: expense.currency,
+      paidBy: expense.paid_by.id,
+      spentOn: expense.spent_on,
+      notes: expense.notes ?? "",
+      groupId: expense.group?.id ?? "",
+    },
+    split: {
+      type: expense.split_type,
+      percentTexts: expense.split_type === SplitType.PERCENT ? textsBy("basis_points") : {},
+      exactTexts: expense.split_type === SplitType.EXACT ? textsBy("amount_minor") : {},
+    },
+  };
+}
+
+function ExpenseForm({ allUsers, groups, expense }) {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { data: users, error: usersError } = useApiData("/users");
+  const location = useLocation();
+  const isEditing = Boolean(expense);
+  // Coming from a group's list starts the new expense in that group
+  const startingGroupId = groups.some((group) => group.id === location.state?.groupId) ? location.state.groupId : null;
+  const initial = initialFormState(expense, user.id, startingGroupId);
 
   const [step, setStep] = useState(0);
-  const [selectedIds, setSelectedIds] = useState([user.id]);
-  const [details, setDetails] = useState({
-    description: "",
-    amountText: "",
-    currency: CurrencyDefault.CODE,
-    paidBy: user.id,
-    spentOn: todayIso(),
-  });
-  const [split, setSplit] = useState({ type: SplitType.EQUAL, percentTexts: {}, exactTexts: {} });
+  const [selectedIds, setSelectedIds] = useState(initial.selectedIds);
+  const [details, setDetails] = useState(initial.details);
+  const [split, setSplit] = useState(initial.split);
+  const [pendingFiles, setPendingFiles] = useState([]);
   const [submitError, setSubmitError] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  if (usersError) return <p className="text-sm text-red-600">{usersError}</p>;
-  if (!users) return <p className="text-gray-500">Loading...</p>;
+  // In a group, only its members can be on the expense
+  const group = groups.find((candidate) => candidate.id === details.groupId) ?? null;
+  const memberIds = group ? new Set(group.members.map((member) => member.id)) : null;
+  const users = memberIds ? allUsers.filter((person) => memberIds.has(person.id)) : allUsers;
 
   // Keep participants in the same order as the list, so the split rows match what was ticked
   const participants = users.filter((person) => selectedIds.includes(person.id));
@@ -265,7 +403,16 @@ export default function CreateExpense() {
     resetSplitInputs();
   };
   const toggleEveryone = () => {
-    setSelectedIds(selectedIds.length === users.length ? [] : users.map((person) => person.id));
+    const allSelected = users.every((person) => selectedIds.includes(person.id));
+    setSelectedIds(allSelected ? [] : users.map((person) => person.id));
+    resetSplitInputs();
+  };
+  const changeGroup = (groupId) => {
+    const nextGroup = groups.find((candidate) => candidate.id === groupId);
+    const nextMemberIds = nextGroup ? new Set(nextGroup.members.map((member) => member.id)) : null;
+    const inGroup = (id) => !nextMemberIds || nextMemberIds.has(id);
+    setSelectedIds((ids) => ids.filter(inGroup));
+    setDetails((current) => ({ ...current, groupId, paidBy: inGroup(current.paidBy) ? current.paidBy : user.id }));
     resetSplitInputs();
   };
 
@@ -313,22 +460,39 @@ export default function CreateExpense() {
   const handleSubmit = async () => {
     setSubmitError(null);
     setIsSubmitting(true);
-    const result = await api.post("/expenses", {
+    const body = {
       description: details.description.trim(),
       amount_minor: amountMinor,
       currency: details.currency,
       paid_by: details.paidBy,
       spent_on: details.spentOn,
+      notes: details.notes.trim() || null,
+      group_id: details.groupId || null,
       split_type: split.type,
       participants: participants.map((person) => ({
         user_id: person.id,
         ...(split.type === SplitType.PERCENT && { basis_points: parseHundredths(split.percentTexts[person.id]) }),
         ...(split.type === SplitType.EXACT && { amount_minor: parseHundredths(split.exactTexts[person.id]) }),
       })),
-    });
-    setIsSubmitting(false);
+    };
+    const result = isEditing ? await api.put(`/expenses/${expense.id}`, body) : await api.post("/expenses", body);
     if (result.status !== ApiStatus.SUCCESS) {
+      setIsSubmitting(false);
       setSubmitError(result.message);
+      return;
+    }
+    if (isEditing) {
+      navigate(expenseRoute(expense.id));
+      return;
+    }
+
+    // The expense is saved either way; a receipt that didn't upload can be retried from its page
+    const uploads = await Promise.all(pendingFiles.map((file) => uploadReceipt(api, result.data.id, file)));
+    const failed = uploads.find((upload) => upload.status !== ApiStatus.SUCCESS);
+    if (failed) {
+      navigate(expenseRoute(result.data.id), {
+        state: { notice: `The expense was saved, but a receipt didn't upload: ${failed.message}` },
+      });
       return;
     }
     navigate(AppRoute.EXPENSES);
@@ -336,10 +500,13 @@ export default function CreateExpense() {
 
   return (
     <section className="max-w-2xl">
-      <Link to={AppRoute.EXPENSES} className="text-sm text-gray-500 hover:text-gray-700">
-        ← Back to expenses
+      <Link
+        to={isEditing ? expenseRoute(expense.id) : AppRoute.EXPENSES}
+        className="text-sm text-gray-500 hover:text-gray-700"
+      >
+        ← {isEditing ? "Back to the expense" : "Back to expenses"}
       </Link>
-      <h1 className="mt-2 text-2xl font-bold">Create an expense</h1>
+      <h1 className="mt-2 text-2xl font-bold">{isEditing ? "Edit expense" : "Create an expense"}</h1>
       <div className="mt-4">
         <StepIndicator currentStep={step} />
       </div>
@@ -348,6 +515,9 @@ export default function CreateExpense() {
         {step === 0 && (
           <ParticipantsStep
             users={users}
+            groups={groups}
+            groupId={details.groupId}
+            onGroupChange={changeGroup}
             currentUserId={user.id}
             selectedIds={selectedIds}
             onToggle={toggleParticipant}
@@ -360,6 +530,12 @@ export default function CreateExpense() {
             currentUserId={user.id}
             details={details}
             onChange={(changes) => setDetails((current) => ({ ...current, ...changes }))}
+            isEditing={isEditing}
+            pendingFiles={pendingFiles}
+            onAddFiles={(files) =>
+              setPendingFiles((current) => [...current, ...files].slice(0, Attachment.MAX_PER_EXPENSE))
+            }
+            onRemoveFile={(index) => setPendingFiles((current) => current.filter((_, i) => i !== index))}
           />
         )}
         {step === 2 && (
@@ -407,7 +583,13 @@ export default function CreateExpense() {
                 disabled={Boolean(splitPreview.error) || isSubmitting}
                 className="rounded-lg bg-primary px-5 py-2 text-sm font-medium text-white disabled:opacity-50"
               >
-                {isSubmitting ? "Creating..." : "Create expense"}
+                {isEditing
+                  ? isSubmitting
+                    ? "Saving..."
+                    : "Save changes"
+                  : isSubmitting
+                    ? "Creating..."
+                    : "Create expense"}
               </button>
             )}
           </div>
@@ -415,4 +597,37 @@ export default function CreateExpense() {
       </div>
     </section>
   );
+}
+
+/** Creates an expense at /expenses/new, or edits one at /expenses/:id/edit */
+export default function CreateExpense() {
+  const { id: editingId } = useParams();
+  const users = useApiData("/users");
+  const groups = useApiData("/groups");
+  const expense = useApiData(editingId ? `/expenses/${editingId}` : null);
+
+  const error = users.error ?? groups.error ?? expense.error;
+  if (error) return <p className="text-sm text-red-600">{error}</p>;
+  if (!users.data || !groups.data || (editingId && !expense.data)) return <p className="text-gray-500">Loading...</p>;
+
+  const isSettled = expense.data?.splits.some((share) => share.settlement_id);
+  if (isSettled || expense.data?.has_part_payment) {
+    return (
+      <section className="max-w-2xl">
+        <h1 className="text-2xl font-bold">Edit expense</h1>
+        <p className="mt-2 text-sm text-gray-600">
+          {isSettled
+            ? "Someone has already settled part of this expense, so it can't be changed."
+            : "A part payment has been made towards this expense, so it can't be changed until it's settled in full."}{" "}
+          Comments and receipts can still be added.
+        </p>
+        <Link to={expenseRoute(editingId)} className="mt-4 inline-block text-sm font-medium text-primary hover:underline">
+          ← Back to the expense
+        </Link>
+      </section>
+    );
+  }
+
+  // Keyed by expense so the form starts fresh when moving between expenses
+  return <ExpenseForm key={editingId ?? "new"} allUsers={users.data} groups={groups.data} expense={expense.data} />;
 }

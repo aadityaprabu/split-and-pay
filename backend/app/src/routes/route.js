@@ -5,6 +5,7 @@ const adminRoutes = require("./admin.route");
 const usersRoutes = require("./users.route");
 const expensesRoutes = require("./expenses.route");
 const settlementsRoutes = require("./settlements.route");
+const groupsRoutes = require("./groups.route");
 
 // Every API route, combined into one router that setup.js mounts at Server.API_PREFIX (/api)
 const router = express.Router();
@@ -15,5 +16,6 @@ router.use(adminRoutes);
 router.use(usersRoutes);
 router.use(expensesRoutes);
 router.use(settlementsRoutes);
+router.use(groupsRoutes);
 
 module.exports = router;

@@ -1,7 +1,7 @@
 import { NavLink } from "react-router-dom";
 import { useAuth } from "../../auth/authContext";
 import { AppRoute } from "../../constants/constants";
-import { HandshakeIcon, ReceiptIcon, ShieldIcon } from "../Icons";
+import { HandshakeIcon, ReceiptIcon, ShieldIcon, UsersIcon } from "../Icons";
 
 function SidebarLink({ to, icon: IconComponent, label, description }) {
   return (
@@ -51,6 +51,7 @@ export default function Sidebar() {
             label="Settle up"
             description="See who owes whom and record payments"
           />
+          <SidebarLink to={AppRoute.GROUPS} icon={UsersIcon} label="Groups" description="Trips and sets of bills" />
         </>
       )}
       {user.is_admin && (

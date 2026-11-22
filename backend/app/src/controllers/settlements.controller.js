@@ -12,11 +12,18 @@ const listSettlements = async (req, res) => {
   res.json(response.success(settlements, "settlements", 200));
 };
 
-// Body: { user_id, currency, net_minor } where net_minor is the balance the user was shown
+// Body: { user_id, currency, net_minor, amount_minor? } where net_minor is the balance the user was shown.
+// amount_minor below the whole balance records a part payment; without it, everything is settled.
 const settleUp = async (req, res) => {
-  const { user_id: otherUserId, currency, net_minor: expectedNetMinor } = req.body ?? {};
-  const settlement = await settlementsService.settleUp(req.user.id, otherUserId, currency, expectedNetMinor);
-  res.status(201).json(response.success(settlement, "settled up", 201));
+  const { user_id: otherUserId, currency, net_minor: expectedNetMinor, amount_minor: amountMinor } = req.body ?? {};
+  const settlement = await settlementsService.settleUp(
+    req.user.id,
+    otherUserId,
+    currency,
+    expectedNetMinor,
+    amountMinor ?? null
+  );
+  res.status(201).json(response.success(settlement, settlement.is_partial ? "payment recorded" : "settled up", 201));
 };
 
 module.exports = { listBalances, listSettlements, settleUp };

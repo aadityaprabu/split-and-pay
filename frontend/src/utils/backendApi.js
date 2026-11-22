@@ -34,6 +34,30 @@ const api = {
     }
   },
 
+  put: async (endpoint, data = {}, config = {}) => {
+    try {
+      const response = await client.put(endpoint, data, config);
+      return response.data;
+    } catch (error) {
+      return toEnvelope(error, endpoint);
+    }
+  },
+
+  // Sends a File or Blob as the raw request body; the backend checks what the file really is
+  upload: async (endpoint, file, fileName) => {
+    try {
+      const response = await client.post(endpoint, file, {
+        headers: {
+          "Content-Type": file.type || "application/octet-stream",
+          "X-File-Name": encodeURIComponent(fileName),
+        },
+      });
+      return response.data;
+    } catch (error) {
+      return toEnvelope(error, endpoint);
+    }
+  },
+
   delete: async (endpoint, config = {}) => {
     try {
       const response = await client.delete(endpoint, config);
