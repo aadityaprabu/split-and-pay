@@ -5,12 +5,12 @@ const { computeShares } = require("./splits.service");
 const { assertGroupCovers } = require("./groups.service");
 const { findParticipantIds } = require("./users.service");
 
-// Expenses outside any group are for the whole flat. One in a group is seen by the group's members,
-// plus anyone on it (someone always sees what they owe or are owed). $1 is the signed-in user.
+// People only see the expenses they're on: ones they paid for or have a share in, plus ones they added
+// (so whoever logged it can still find, edit or delete it). Group or not, nobody else sees it.
+// $1 is the signed-in user.
 const VISIBLE_TO_USER = `(
-  expenses.group_id IS NULL
-  OR expenses.paid_by = $1
-  OR EXISTS (SELECT 1 FROM group_members WHERE group_members.group_id = expenses.group_id AND group_members.user_id = $1)
+  expenses.paid_by = $1
+  OR expenses.created_by = $1
   OR EXISTS (SELECT 1 FROM expense_splits mine WHERE mine.expense_id = expenses.id AND mine.user_id = $1)
 )`;
 

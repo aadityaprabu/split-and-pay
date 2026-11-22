@@ -67,7 +67,7 @@ test("someone who neither added nor paid can't edit, and nobody can once a share
 
 // ---- Groups ----
 
-test("a group's expenses are seen by its members and the people on them, and can be filtered", async () => {
+test("people only see the expenses they're on, group or not, and can filter by group", async () => {
   const { asha, bala, chen } = await setup();
   const created = await asha.client.post("/groups", { name: "Goa trip", member_ids: [bala.user.id] });
   assert.equal(created.status, 201);
@@ -78,13 +78,17 @@ test("a group's expenses are seen by its members and the people on them, and can
     expenseBody(asha.user.id, [asha.user.id, bala.user.id], 2000, { group_id: groupId })
   );
   const flatId = await addExpense(asha.client, expenseBody(asha.user.id, [asha.user.id, chen.user.id], 2000));
+  // Bala logs something Chen paid for Asha: Bala added it, so Bala still sees it
+  const loggedId = await addExpense(bala.client, expenseBody(chen.user.id, [asha.user.id], 1000));
 
   const ids = async (client, query = "") => (await client.get(`/expenses${query}`)).body.data.map((e) => e.id);
-  assert.deepEqual((await ids(bala.client)).sort(), [tripId, flatId].sort());
-  assert.deepEqual(await ids(chen.client), [flatId], "Chen isn't in the trip");
+  assert.deepEqual((await ids(asha.client)).sort(), [tripId, flatId, loggedId].sort());
+  assert.deepEqual((await ids(bala.client)).sort(), [tripId, loggedId].sort(), "Bala isn't on the Asha-Chen expense");
+  assert.deepEqual((await ids(chen.client)).sort(), [flatId, loggedId].sort(), "Chen isn't on the trip");
   assert.equal((await chen.client.get(`/expenses/${tripId}`)).status, 404);
+  assert.equal((await bala.client.get(`/expenses/${flatId}`)).status, 404, "not even outside a group");
   assert.deepEqual(await ids(asha.client, `?group_id=${groupId}`), [tripId]);
-  assert.deepEqual(await ids(asha.client, "?group_id=none"), [flatId]);
+  assert.deepEqual((await ids(asha.client, "?group_id=none")).sort(), [flatId, loggedId].sort());
 
   const trip = (await bala.client.get(`/expenses/${tripId}`)).body.data;
   assert.deepEqual(trip.group, { id: groupId, name: "Goa trip" });

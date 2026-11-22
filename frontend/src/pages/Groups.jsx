@@ -183,7 +183,7 @@ export default function Groups() {
         <div>
           <h1 className="text-2xl font-bold">Groups</h1>
           <p className="mt-1 text-sm text-gray-600">
-            Keep a trip or a set of bills together. Only a group's members see its expenses. Balances and settling up
+            Keep a trip or a set of bills together. Each expense is only seen by the people on it. Balances and settling up
             still cover everything between two people.
           </p>
         </div>
@@ -218,7 +218,7 @@ export default function Groups() {
       {groups.isLoading && <p className="mt-6 text-gray-500">Loading...</p>}
       {groups.data?.length === 0 && editing === null && (
         <p className="mt-6 rounded-2xl border border-gray-200 bg-white p-4 text-sm text-gray-600">
-          No groups yet. Expenses without a group are shared with the whole flat.
+          No groups yet. Expenses don't need one.
         </p>
       )}
       {groups.data?.length > 0 && (

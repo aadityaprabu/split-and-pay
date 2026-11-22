@@ -243,21 +243,25 @@ Removing someone from the list signs them out immediately. Their past expenses s
   3. how to split it.
 
   The split step shows each person's share live, and you can only submit once it adds up exactly.
+- **You only see expenses you're on:** ones you paid for, have a share in, or added yourself. Nobody
+  else's splits show up on your Expenses page, and their pages, comments and receipts are hidden from you.
 - **Expense tiles** show the total, where you stand, each person's share, and how many shares are
   settled. Click a tile to open the expense.
 - **The expense page** shows the full split, notes, receipts and comments. Anyone who can see the
   expense can comment on it and attach receipts (photos are shrunk in the browser; up to 5 files of
   5 MB each, JPEG, PNG, WebP or PDF). Whoever added or paid for an expense can **edit** or **delete** it,
   until someone has settled part of it.
-- **Groups** keep a trip or a set of bills together. Only a group's members (and anyone on one of its
-  expenses) see its expenses, and the Expenses page can be filtered by group. Balances and settling up
+- **Groups** keep a trip or a set of bills together. The Expenses page can be filtered by group (you
+  still only see the group's expenses you're on). Balances and settling up
   still cover everything between two people, across groups. Only whoever made a group can rename it, change
   its members or delete it. A group with expenses can't be deleted, and someone who added, paid for or
   has a share in one of its expenses can't be removed from it.
 - **My transactions** lists only the expenses you paid for or have a share in, newest first, 10 at a
   time (**Show more**, then **Load more**). A monthly summary above it shows, per month and currency,
   how many there were, how much you paid and how much was your share. Filter both by date range, by
-  part of the title, or by a person who was on the expense with you.
+  part of the title, or by a person who was on the expense with you. **Download CSV** saves every
+  transaction matching the filters (not just the ones loaded on screen), ready to open in Excel or
+  Google Sheets.
 - **Settle up** shows your net balance with each person, per currency. **Settle up → Confirm** records
   the payment and marks the shared expenses between the two of you as settled. Choose **Part of it** to
   record a partial payment instead: it lowers the balance, the expenses stay open, and the next full

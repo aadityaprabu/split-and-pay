@@ -32,7 +32,7 @@ export default function Expenses() {
   return (
     <section>
       <h1 className="text-2xl font-bold">Expenses</h1>
-      <p className="mt-1 text-sm text-gray-600">Everything the flat has split, newest first.</p>
+      <p className="mt-1 text-sm text-gray-600">The expenses you paid for, have a share in or added, newest first.</p>
       {(error || actionError) && <p className="mt-3 text-sm text-red-600">{actionError ?? error}</p>}
 
       {groups?.length > 0 && (
