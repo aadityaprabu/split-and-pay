@@ -36,6 +36,12 @@ export const ShieldIcon = (props) => (
   </Icon>
 );
 
+export const ListIcon = (props) => (
+  <Icon {...props}>
+    <path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01" />
+  </Icon>
+);
+
 export const PlusIcon = (props) => (
   <Icon {...props}>
     <path d="M12 5v14M5 12h14" />

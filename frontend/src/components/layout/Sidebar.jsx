@@ -1,7 +1,7 @@
 import { NavLink } from "react-router-dom";
 import { useAuth } from "../../auth/authContext";
 import { AppRoute } from "../../constants/constants";
-import { HandshakeIcon, ReceiptIcon, ShieldIcon, UsersIcon } from "../Icons";
+import { HandshakeIcon, ListIcon, ReceiptIcon, ShieldIcon, UsersIcon } from "../Icons";
 
 function SidebarLink({ to, icon: IconComponent, label, description }) {
   return (
@@ -44,6 +44,12 @@ export default function Sidebar() {
             icon={ReceiptIcon}
             label="Add an expense"
             description="Create and review shared expenses"
+          />
+          <SidebarLink
+            to={AppRoute.TRANSACTIONS}
+            icon={ListIcon}
+            label="My transactions"
+            description="Everything you're part of, month by month"
           />
           <SidebarLink
             to={AppRoute.SETTLE_UP}

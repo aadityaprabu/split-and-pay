@@ -81,6 +81,13 @@ const Attachment = Object.freeze({
   CONTENT_TYPES: Object.freeze(["image/jpeg", "image/png", "image/webp", "application/pdf"]),
 });
 
+// The "My transactions" page: the expenses the signed-in user paid for or has a share in
+const Transaction = Object.freeze({
+  PAGE_SIZE: 10,
+  MAX_PAGE_SIZE: 50,
+  SEARCH_MAX_LENGTH: 100,
+});
+
 module.exports = {
   EnvironmentName,
   Server,
@@ -97,4 +104,5 @@ module.exports = {
   Group,
   Comment,
   Attachment,
+  Transaction,
 };

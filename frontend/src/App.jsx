@@ -6,6 +6,7 @@ import Dashboard from "./pages/Dashboard";
 import Groups from "./pages/Groups";
 import Login from "./pages/Login";
 import SettleUp from "./pages/SettleUp";
+import Transactions from "./pages/Transactions";
 import CreateExpense from "./pages/expenses/CreateExpense";
 import ExpenseDetail from "./pages/expenses/ExpenseDetail";
 import Expenses from "./pages/expenses/Expenses";
@@ -35,6 +36,7 @@ export default function App() {
             <Route path={AppRoute.EXPENSE} element={<ExpenseDetail />} />
             <Route path={AppRoute.EDIT_EXPENSE} element={<CreateExpense />} />
             <Route path={AppRoute.GROUPS} element={<Groups />} />
+            <Route path={AppRoute.TRANSACTIONS} element={<Transactions />} />
             <Route path={AppRoute.SETTLE_UP} element={<SettleUp />} />
           </>
         )}
